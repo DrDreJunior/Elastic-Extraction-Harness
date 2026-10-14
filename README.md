@@ -10,7 +10,7 @@ The model is the only non-deterministic piece. Everything around it is ordinary 
 
 - Python 3.10+ · FastAPI · Pydantic v2
 - Works with any OpenAI-compatible endpoint (OpenAI / DeepSeek / Qwen / a local vLLM) via `OPENAI_BASE_URL`
-- 54 tests, all offline (the model is a scripted fake)
+- 58 tests, all offline (the model is a scripted fake), plus real-model integration tests
 
 ## Quick start
 
@@ -19,7 +19,7 @@ python -m venv .venv
 # macOS/Linux: source .venv/bin/activate   |   Windows: .venv\Scripts\activate
 pip install -r requirements-dev.txt
 
-pytest                          # 54 tests, no API key needed
+pytest                          # 58 tests, no API key needed
 python -m examples.run_demo     # the 4 benchmark transcripts against a fake model
 
 # real service
@@ -28,6 +28,25 @@ uvicorn app.main:app --port 8000
 ```
 
 Everything except the last command runs without an API key.
+
+### Run with a local Ollama (no external API)
+
+The stack also runs against a local/LAN [Ollama](https://ollama.com) instance via
+its OpenAI-compatible endpoint. Pull a model and run the real smoke test:
+
+```bash
+ollama pull deepseek-coder-v2:16b
+python -m examples.ollama_smoke    # all 4 cases against the real model
+
+# point the service at a LAN Ollama
+export OLLAMA_HOST=http://192.168.2.7:11434
+export OLLAMA_MODEL=deepseek-coder-v2:16b
+```
+
+`app.ollama` builds the client/harness with the `/v1` suffix and a placeholder
+key. It treats `OLLAMA_HOST=0.0.0.0` as a bind spec and connects to
+`127.0.0.1:11434`, defaulting the port to `11434` when it is omitted. The
+default model is `deepseek-coder-v2:16b`; qwen3:8b works too once pulled.
 
 ## How it works
 
@@ -163,7 +182,7 @@ app/
 ├── fakes.py           # scripted sync/async model stubs
 └── logging_config.py  # structured JSON logging
 
-tests/                 # 54 offline tests
+tests/                 # 58 offline tests + Ollama integration (skips when no server)
 examples/run_demo.py
 .github/workflows/ci.yml
 ```
@@ -185,6 +204,8 @@ examples/run_demo.py
 | `BLOCK_ON_INJECTION` | `true` | Output-guard hit returns `FALLBACK` without another call. |
 | `EXPOSE_RAW_LLM_OUTPUTS` | `false` | Include raw model text on HTTP responses. |
 | `LOG_LEVEL` | `INFO` | Log level. |
+| `OLLAMA_HOST` | `http://192.168.2.7:11434` | Used by `app.ollama`. `0.0.0.0` connects to `127.0.0.1`. |
+| `OLLAMA_MODEL` | `deepseek-coder-v2:16b` | Model used by the Ollama factory. |
 
 Bad values fail at startup (e.g. `MAX_REPAIR_ATTEMPTS` outside 0–5).
 

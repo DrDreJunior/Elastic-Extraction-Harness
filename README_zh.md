@@ -10,7 +10,7 @@
 
 - Python 3.10+ · FastAPI · Pydantic v2
 - 通过 `OPENAI_BASE_URL` 适配任意 OpenAI 兼容端点（OpenAI / DeepSeek / Qwen / 本地 vLLM）
-- 54 个测试，全部离线（模型是脚本化的假桩）
+- 58 个测试，全部离线（模型是脚本化的假桩），另有真实模型集成测试
 
 ## 快速开始
 
@@ -19,7 +19,7 @@ python -m venv .venv
 # macOS/Linux: source .venv/bin/activate   |   Windows: .venv\Scripts\activate
 pip install -r requirements-dev.txt
 
-pytest                          # 54 个测试，无需 API Key
+pytest                          # 58 个测试，无需 API Key
 python -m examples.run_demo     # 用假模型跑 4 个基准对话
 
 # 真实服务
@@ -28,6 +28,21 @@ uvicorn app.main:app --port 8000
 ```
 
 除最后一条外，所有命令都不需要 API Key。
+
+### 使用本地 Ollama（无需外部 API）
+
+系统也能通过 [Ollama](https://ollama.com) 的 OpenAI 兼容端点，接入本机或局域网的 Ollama。拉取模型后跑真实冒烟：
+
+```bash
+ollama pull deepseek-coder-v2:16b
+python -m examples.ollama_smoke    # 用真实模型跑 4 个基准对话
+
+# 把服务指向局域网 Ollama
+export OLLAMA_HOST=http://192.168.2.7:11434
+export OLLAMA_MODEL=deepseek-coder-v2:16b
+```
+
+`app.ollama` 会补上 `/v1` 后缀并使用占位 Key；它把 `OLLAMA_HOST=0.0.0.0` 视为绑定地址，实际连接 `127.0.0.1:11434`，省略端口时默认使用 `11434`。默认模型为 `deepseek-coder-v2:16b`（已端到端验证）；拉取 qwen3:8b 后也可使用。
 
 ## 工作原理
 
@@ -163,7 +178,7 @@ app/
 ├── fakes.py           # 同步/异步脚本化模型桩
 └── logging_config.py  # 结构化 JSON 日志
 
-tests/                 # 54 个离线测试
+tests/                 # 58 个离线测试 + Ollama 集成测试（无服务时自动跳过）
 examples/run_demo.py
 .github/workflows/ci.yml
 ```
@@ -185,6 +200,8 @@ examples/run_demo.py
 | `BLOCK_ON_INJECTION` | `true` | 输出安全门命中直接返回 `FALLBACK`，不再调用。 |
 | `EXPOSE_RAW_LLM_OUTPUTS` | `false` | HTTP 响应是否包含模型原始文本。 |
 | `LOG_LEVEL` | `INFO` | 日志级别。 |
+| `OLLAMA_HOST` | `http://192.168.2.7:11434` | 供 `app.ollama` 使用；`0.0.0.0` 实际连接 `127.0.0.1`。 |
+| `OLLAMA_MODEL` | `deepseek-coder-v2:16b` | Ollama 工厂使用的模型。 |
 
 非法值启动即报错（如 `MAX_REPAIR_ATTEMPTS` 超出 0–5）。
 
